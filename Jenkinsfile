@@ -1,39 +1,38 @@
 pipeline {
-    agent { label "dev-server"}
-    
+    agent any
     stages {
-        
-        stage("code"){
-            steps{
-                git url: "https://github.com/LondheShubham153/node-todo-cicd.git", branch: "master"
-                echo 'bhaiyya code clone ho gaya'
+        stage('git cloning') {
+            steps {
+                git branch: 'master', credentialsId: 'git', url: 'https://github.com/Rajiv-Chaurasiya/nodejs-ci-cd-jenkins.git'
             }
         }
-        stage("build and test"){
-            steps{
-                sh "docker build -t node-app-test-new ."
-                echo 'code build bhi ho gaya'
+        stage('install dependecies') {
+            steps {
+                sh 'npm install'
             }
         }
-        stage("scan image"){
-            steps{
-                echo 'image scanning ho gayi'
-            }
-        }
-        stage("push"){
-            steps{
-                withCredentials([usernamePassword(credentialsId:"dockerHub",passwordVariable:"dockerHubPass",usernameVariable:"dockerHubUser")]){
-                sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPass}"
-                sh "docker tag node-app-test-new:latest ${env.dockerHubUser}/node-app-test-new:latest"
-                sh "docker push ${env.dockerHubUser}/node-app-test-new:latest"
-                echo 'image push ho gaya'
+        stage('scanner') {
+            steps {
+                script{
+                    def sonarHome = tool 'sonar'
+                    withSonarQubeEnv('sonar') {
+                        sh "${sonarHome}/bin/sonar-scanner"
+                    }    
                 }
             }
         }
-        stage("deploy"){
-            steps{
-                sh "docker-compose down && docker-compose up -d"
-                echo 'deployment ho gayi'
+        stage('image') {
+            steps {
+                sh 'docker system prune -a'
+                sh 'docker build -t rajiv84ia/nodejs-nodetodo .'
+            }
+        }
+        stage('docker hub') {
+            steps {
+                withCredentials([string(credentialsId: 'docker', variable: 'docker')]) {
+                    sh 'docker login -u rajiv84ia -p ${docker}'
+                    sh 'docker push rajiv84ia/nodejs-nodetodo'
+                } 
             }
         }
     }
